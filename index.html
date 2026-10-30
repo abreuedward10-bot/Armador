@@ -13,9 +13,19 @@
         
         .block-container { background: #18181b; border: 1px solid #3f3f46; border-radius: 10px; padding: 12px; margin-bottom: 15px; }
         .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        
+        .header-left { display: flex; align-items: center; gap: 8px; }
         label { font-size: 0.85rem; font-weight: bold; color: #06b6d4; }
         
-        .btn-trash { background: rgba(255, 42, 42, 0.15); border: 1px solid #ff2a2a; color: #ff2a2a; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
+        .btn-action-small { 
+            background: rgba(255, 255, 255, 0.1); border: 1px solid #52525b; color: #fff; 
+            border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; 
+            cursor: pointer; display: none; /* Oculto por defecto */
+        }
+        .btn-undo { border-color: #39FF14; color: #39FF14; background: rgba(57, 255, 20, 0.1); }
+        .btn-undo:active { background: #39FF14; color: #000; }
+
+        .btn-trash { background: rgba(255, 42, 42, 0.15); border: 1px solid #ff2a2a; color: #ff2a2a; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .btn-trash:active { background: #ff2a2a; color: white; }
 
         textarea { 
@@ -55,69 +65,64 @@
     </div>
 
     <script>
-        // Lista exacta de tus bloques en el orden de la captura
         const BLOQUES = [
-            "1. sbloqueantesdetodos.txt",
-            "2. bloque2A.txt",
-            "3. bloque2b.txt",
-            "4. bloque2C.txt",
-            "5. bloque2D.txt",
-            "6. bloquepegardespuesdebloqueantesdetodosytodoslosbloques2.txt",
-            "7. bloque1A.txt",
-            "8. bloque1B.txt",
-            "9. bloque1c.txt",
-            "10. bloque1d.txt",
-            "11. bloque3A.txt",
-            "12. bloque3B.txt",
-            "13. bloque3C.txt",
-            "14. bloque4A.txt",
-            "15. bloque4B.txt",
-            "16. bloque4CA.txt",
-            "17. bloque4CB.txt",
-            "18. bloque5A.txt",
-            "19. bloque5b.txt",
-            "20. bloque5C.txt",
-            "21. bloque5D.txt",
-            "22. bloque5E.txt",
-            "23. bloque6A.txt",
-            "24. bloque6B.txt"
+            "1. sbloqueantesdetodos.txt", "2. bloque2A.txt", "3. bloque2b.txt", "4. bloque2C.txt", "5. bloque2D.txt",
+            "6. bloquepegardespuesdebloqueantesdetodosytodoslosbloques2.txt", "7. bloque1A.txt", "8. bloque1B.txt",
+            "9. bloque1c.txt", "10. bloque1d.txt", "11. bloque3A.txt", "12. bloque3B.txt", "13. bloque3C.txt",
+            "14. bloque4A.txt", "15. bloque4B.txt", "16. bloque4CA.txt", "17. bloque4CB.txt", "18. bloque5A.txt",
+            "19. bloque5b.txt", "20. bloque5C.txt", "21. bloque5D.txt", "22. bloque5E.txt", "23. bloque6A.txt", "24. bloque6B.txt"
         ];
 
         const container = document.getElementById('blocks-container');
+        // Objeto para guardar el texto antes de borrarlo
+        const textosBorradosTemporal = {};
 
-        // Crear las cajas de texto dinámicamente
         BLOQUES.forEach((nombre, index) => {
             const div = document.createElement('div');
             div.className = 'block-container';
             
-            // Header con el nombre y el botón de borrar
             const headerDiv = document.createElement('div');
             headerDiv.className = 'block-header';
+            
+            const leftDiv = document.createElement('div');
+            leftDiv.className = 'header-left';
             
             const label = document.createElement('label');
             label.innerText = nombre;
             
+            // Botón de Deshacer (Oculto al inicio)
+            const btnUndo = document.createElement('button');
+            btnUndo.className = 'btn-action-small btn-undo';
+            btnUndo.id = 'btn-undo-' + index;
+            btnUndo.innerText = '↩️ Deshacer';
+            btnUndo.onclick = () => deshacerBorrado(index);
+            
+            leftDiv.appendChild(label);
+            leftDiv.appendChild(btnUndo);
+            
+            // Botón de Basura
             const btnTrash = document.createElement('button');
             btnTrash.className = 'btn-trash';
             btnTrash.innerText = '🗑️';
-            btnTrash.title = 'Borrar contenido de esta casilla';
+            btnTrash.title = 'Borrar contenido';
             btnTrash.onclick = () => borrarBloque(index);
             
-            headerDiv.appendChild(label);
+            headerDiv.appendChild(leftDiv);
             headerDiv.appendChild(btnTrash);
             
             const textarea = document.createElement('textarea');
             textarea.id = 'bloque-' + index;
             textarea.placeholder = 'Pega aquí el contenido de ' + nombre;
             
-            // Cargar texto guardado si existe
             const saved = localStorage.getItem('jf_block_' + index);
             if (saved) textarea.value = saved;
 
-            // Guardar automáticamente al escribir
+            // Al escribir, guardar y ocultar el botón de deshacer
             textarea.addEventListener('input', (e) => {
                 localStorage.setItem('jf_block_' + index, e.target.value);
                 document.getElementById('status').innerText = 'Guardado automático activo ✔️';
+                // Si el usuario escribe, ya no tiene sentido el botón deshacer
+                document.getElementById('btn-undo-' + index).style.display = 'none'; 
             });
 
             div.appendChild(headerDiv);
@@ -125,25 +130,44 @@
             container.appendChild(div);
         });
 
-        // Función para borrar una casilla específica
         function borrarBloque(index) {
-            if (confirm('¿Seguro que quieres borrar el contenido de ' + BLOQUES[index] + '?')) {
-                document.getElementById('bloque-' + index).value = '';
-                localStorage.removeItem('jf_block_' + index);
-                document.getElementById('status').innerText = 'Bloque borrado.';
+            const textarea = document.getElementById('bloque-' + index);
+            const btnUndo = document.getElementById('btn-undo-' + index);
+            
+            if (textarea.value.trim() === '') return; // Si ya está vacío, no hace nada
+
+            // Guardamos el texto en memoria temporal
+            textosBorradosTemporal[index] = textarea.value;
+            
+            // Borramos el textarea y el storage
+            textarea.value = '';
+            localStorage.removeItem('jf_block_' + index);
+            
+            // Mostramos el botón de deshacer
+            btnUndo.style.display = 'inline-block';
+            document.getElementById('status').innerText = 'Bloque borrado. Toca ↩️ Deshacer para recuperar.';
+        }
+
+        function deshacerBorrado(index) {
+            const textoRecuperado = textosBorradosTemporal[index];
+            const textarea = document.getElementById('bloque-' + index);
+            const btnUndo = document.getElementById('btn-undo-' + index);
+
+            if (textoRecuperado !== undefined) {
+                textarea.value = textoRecuperado;
+                localStorage.setItem('jf_block_' + index, textoRecuperado);
+                btnUndo.style.display = 'none'; // Ocultamos el botón otra vez
+                document.getElementById('status').innerText = '¡Texto recuperado con éxito! ✅';
             }
         }
 
-        // Función para descargar el index unificado
         function descargarHTML() {
             const nombreInput = document.getElementById('filename').value.trim() || 'index';
             let contenidoFinal = '';
 
             for (let i = 0; i < BLOQUES.length; i++) {
                 const txt = document.getElementById('bloque-' + i).value;
-                if (txt) {
-                    contenidoFinal += txt + '\n'; 
-                }
+                if (txt) { contenidoFinal += txt + '\n'; }
             }
 
             if (!contenidoFinal) {
@@ -164,7 +188,6 @@
             document.getElementById('status').innerText = '¡Archivo HTML descargado con éxito!';
         }
 
-        // Función para descargar todos los bloques en un ZIP
         async function descargarZIP() {
             if (typeof JSZip === 'undefined') {
                 alert("La librería ZIP no se ha cargado. Verifica tu conexión a internet.");
@@ -177,7 +200,6 @@
             for (let i = 0; i < BLOQUES.length; i++) {
                 const txt = document.getElementById('bloque-' + i).value;
                 if (txt && txt.trim() !== '') {
-                    // Limpiamos el nombre para que sea válido como archivo
                     const nombreLimpio = BLOQUES[i].replace(/[^a-zA-Z0-9_\-\.]/g, '_');
                     zip.file(nombreLimpio, txt);
                     hayDatos = true;
@@ -204,7 +226,6 @@
                 document.getElementById('status').innerText = '¡ZIP descargado con éxito! ✅';
             } catch (error) {
                 alert("Hubo un error al crear el ZIP: " + error.message);
-                document.getElementById('status').innerText = 'Error al crear ZIP.';
             }
         }
     </script>
