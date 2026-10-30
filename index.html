@@ -71,7 +71,7 @@
         
         <button class="btn-main" onclick="descargarHTML()">⬇️ Descargar Index Completo</button>
         <button class="btn-secondary" onclick="descargarZIP()">📦 Descargar ZIP con los .txt</button>
-        <button class="btn-validate" onclick="validarCodigoPorBloques()">🔍 Validar Código (Casilla por Casilla)</button>
+        <button class="btn-validate" onclick="validarEstructuraHTML()">🔍 Validar Estructura</button>
         
         <div class="save-status" id="status">Esperando texto...</div>
     </div>
@@ -112,19 +112,16 @@
             const btnUndo = document.createElement('button');
             btnUndo.className = 'btn-small btn-undo';
             btnUndo.innerText = '↩️';
-            btnUndo.title = 'Deshacer último cambio';
             btnUndo.onclick = () => deshacer(index);
             
             const btnPaste = document.createElement('button');
             btnPaste.className = 'btn-small btn-paste';
             btnPaste.innerText = '📋';
-            btnPaste.title = 'Pegar desde el portapapeles';
             btnPaste.onclick = () => pegarTexto(index);
             
             const btnTrash = document.createElement('button');
             btnTrash.className = 'btn-small btn-trash';
             btnTrash.innerText = '🗑️';
-            btnTrash.title = 'Borrar todo el contenido';
             btnTrash.onclick = () => borrarBloqueCompleto(index);
             
             btnGroup.appendChild(btnUndo);
@@ -137,7 +134,6 @@
             
             const textarea = document.createElement('textarea');
             textarea.id = 'bloque-' + index;
-            textarea.placeholder = 'Pega aquí el contenido...';
             
             const saved = localStorage.getItem('jf_block_' + index);
             if (saved) {
@@ -151,7 +147,6 @@
                 localStorage.setItem('jf_block_' + index, e.target.value);
                 document.getElementById('status').innerText = 'Guardado automático activo ✔️';
                 div.classList.remove('block-error');
-
                 clearTimeout(guardandoTimeout[index]);
                 guardandoTimeout[index] = setTimeout(() => {
                     const valorActual = e.target.value;
@@ -168,7 +163,6 @@
             container.appendChild(div);
         });
 
-        // --- FUNCIONES DE LOS BOTONES ---
         function pegarTexto(index) {
             const textarea = document.getElementById('bloque-' + index);
             navigator.clipboard.readText().then(texto => {
@@ -189,7 +183,6 @@
         function deshacer(index) {
             const textarea = document.getElementById('bloque-' + index);
             const hist = historial[index];
-            
             if (hist.length > 1) {
                 hist.pop();
                 const estadoAnterior = hist[hist.length - 1];
@@ -211,7 +204,6 @@
         function borrarBloqueCompleto(index) {
             const textarea = document.getElementById('bloque-' + index);
             if (textarea.value.trim() === '') return;
-
             if (confirm('¿Borrar todo el contenido de esta casilla?')) {
                 historial[index].push(textarea.value);
                 textarea.value = '';
@@ -221,11 +213,12 @@
             }
         }
 
-        // --- VALIDACIÓN INTELIGENTE (Ignora textos y comentarios) ---
-        function validarCodigoPorBloques() {
+        // --- VALIDACIÓN DE ESTRUCTURA REAL (Etiquetas HTML) ---
+        function validarEstructuraHTML() {
             let bloquesConError = [];
             let bloquesVacios = 0;
 
+            // Limpiamos bordes rojos anteriores
             document.querySelectorAll('.block-container').forEach(el => el.classList.remove('block-error'));
 
             for (let i = 0; i < BLOQUES.length; i++) {
@@ -236,31 +229,23 @@
                     continue; 
                 }
 
-                // 1. Limpiar el texto: quitar comentarios HTML, JS y CSS
-                let textLimpio = txt.replace(/<!--[\s\S]*?-->/g, '') // Comentarios HTML <!-- -->
-                                  .replace(/\/\*[\s\S]*?\*\//g, '')  // Comentarios CSS/JS /* */
-                                  .replace(/\/\/.*$/gm, '');         // Comentarios JS //
-
-                // 2. Quitar textos entre comillas (simples, dobles y backticks)
-                // Esto evita que un paréntesis dentro de un string cuente como error.
-                textLimpio = textLimpio.replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '""');
-
-                // 3. Contar solo los caracteres reales
-                const openParens = (textLimpio.match(/\(/g) || []).length;
-                const closeParens = (textLimpio.match(/\)/g) || []).length;
-                
-                const openBraces = (textLimpio.match(/\{/g) || []).length;
-                const closeBraces = (textLimpio.match(/\}/g) || []).length;
-                
-                const openBrackets = (textLimpio.match(/\[/g) || []).length;
-                const closeBrackets = (textLimpio.match(/\]/g) || []).length;
+                // Buscamos aperturas y cierres de etiquetas críticas
+                const countOpenTag = (tag) => (txt.match(new RegExp(`<${tag}(?:\\s|>)`, 'gi')) || []).length;
+                const countCloseTag = (tag) => (txt.match(new RegExp(`</${tag}>`, 'gi')) || []).length;
 
                 let errorEnBloque = false;
 
-                if (openParens !== closeParens) errorEnBloque = true;
-                if (openBraces !== closeBraces) errorEnBloque = true;
-                if (openBrackets !== closeBrackets) errorEnBloque = true;
+                // Revisar etiquetas <div>
+                // (Es la más común y la que más se rompe si se borra una línea)
+                if (countOpenTag('div') !== countCloseTag('div')) errorEnBloque = true;
+                
+                // Revisar etiquetas <script>
+                if (countOpenTag('script') !== countCloseTag('script')) errorEnBloque = true;
+                
+                // Revisar etiquetas <style>
+                if (countOpenTag('style') !== countCloseTag('style')) errorEnBloque = true;
 
+                // Si encontramos diferencias, marcamos error
                 if (errorEnBloque) {
                     bloquesConError.push(i + 1);
                     document.getElementById('container-' + i).classList.add('block-error');
@@ -273,7 +258,7 @@
                 const primerError = bloquesConError[0] - 1;
                 document.getElementById('container-' + primerError).scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                alert(`🚨 SE DETECTARON ERRORES EN LOS BLOQUES:\n\n${bloquesConError.join(', ')}\n\nLas casillas con el borde rojo tienen llaves { }, paréntesis ( ) o corchetes [ ] desbalanceados en el código real. Revisa si borraste alguna línea.`);
+                alert(`🚨 POSIBLE ERROR ESTRUCTURAL EN LOS BLOQUES:\n\n${bloquesConError.join(', ')}\n\nLas casillas con el borde rojo parecen tener etiquetas <div>, <script> o <style> sin cerrar. Revisa si borraste una etiqueta por accidente.`);
                 statusEl.innerText = 'Validación fallida ❌ (Revisa los bordes rojos)';
                 statusEl.style.color = '#ff2a2a';
             } else if (bloquesVacios === BLOQUES.length) {
@@ -281,8 +266,8 @@
                 statusEl.innerText = 'Casillas vacías.';
                 statusEl.style.color = '#a1a1aa';
             } else {
-                alert("✅ ¡TODO PARECE ESTAR BIEN!\n\nNo se detectaron errores en el código (ignorando textos y comentarios).");
-                statusEl.innerText = 'Código validado ✔️ (Todo en orden)';
+                alert("✅ ¡ESTRUCTURA PERFECTA!\n\nTodas las etiquetas <div>, <script> y <style> están abiertas y cerradas correctamente.");
+                statusEl.innerText = 'Estructura validada ✔️ (Todo en orden)';
                 statusEl.style.color = '#39FF14';
             }
         }
