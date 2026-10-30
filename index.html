@@ -12,24 +12,26 @@
         p.sub { text-align: center; color: #a1a1aa; font-size: 0.85rem; margin-top: 0; margin-bottom: 20px; }
         
         .block-container { background: #18181b; border: 1px solid #3f3f46; border-radius: 10px; padding: 12px; margin-bottom: 15px; }
-        .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 5px;}
+        .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;}
         
-        .header-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;}
+        .header-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; justify-content: space-between;}
+        .title-wrap { display: flex; align-items: center; gap: 8px; }
         label { font-size: 0.85rem; font-weight: bold; color: #06b6d4; }
         
-        .btn-action-small { 
+        .btn-group { display: flex; gap: 4px; }
+        .btn-small { 
             background: rgba(255, 255, 255, 0.1); border: 1px solid #52525b; color: #fff; 
-            border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; 
-            cursor: pointer; display: none; /* Oculto por defecto */
+            border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: bold; 
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-        .btn-undo-block { border-color: #39FF14; color: #39FF14; background: rgba(57, 255, 20, 0.1); }
-        .btn-undo-block:active { background: #39FF14; color: #000; }
+        
+        .btn-undo { border-color: #f59e0b; color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+        .btn-undo:active { background: #f59e0b; color: #000; }
+        
+        .btn-paste { border-color: #06b6d4; color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+        .btn-paste:active { background: #06b6d4; color: #000; }
 
-        .btn-undo-edit { border-color: #f59e0b; color: #f59e0b; background: rgba(245, 158, 11, 0.1); opacity: 0.4; pointer-events: none;}
-        .btn-undo-edit.active { opacity: 1; pointer-events: auto; }
-        .btn-undo-edit:active { background: #f59e0b; color: #000; }
-
-        .btn-trash { background: rgba(255, 42, 42, 0.15); border: 1px solid #ff2a2a; color: #ff2a2a; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
+        .btn-trash { border-color: #ff2a2a; color: #ff2a2a; background: rgba(255, 42, 42, 0.15); }
         .btn-trash:active { background: #ff2a2a; color: white; }
 
         textarea { 
@@ -78,9 +80,9 @@
         ];
 
         const container = document.getElementById('blocks-container');
-        const textosBorradosTemporal = {}; // Para el deshacer de bloque completo
-        const historialEdicion = {}; // Para el deshacer de escritura
-        const timeoutEdicion = {}; // Para agrupar cambios de escritura
+        // Historial para deshacer ediciones
+        const historial = {};
+        const guardandoTimeout = {};
 
         BLOQUES.forEach((nombre, index) => {
             const div = document.createElement('div');
@@ -92,64 +94,74 @@
             const leftDiv = document.createElement('div');
             leftDiv.className = 'header-left';
             
+            const titleWrap = document.createElement('div');
+            titleWrap.className = 'title-wrap';
             const label = document.createElement('label');
             label.innerText = nombre;
+            titleWrap.appendChild(label);
             
-            // Botón 1: Deshacer borrado completo (Basurero)
-            const btnUndoBlock = document.createElement('button');
-            btnUndoBlock.className = 'btn-action-small btn-undo-block';
-            btnUndoBlock.id = 'btn-undoblock-' + index;
-            btnUndoBlock.innerText = '↩️ Restaurar';
-            btnUndoBlock.onclick = () => restaurarBloqueBorrado(index);
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'btn-group';
             
-            // Botón 2: Deshacer edición de texto (Escritura)
-            const btnUndoEdit = document.createElement('button');
-            btnUndoEdit.className = 'btn-action-small btn-undo-edit';
-            btnUndoEdit.id = 'btn-undoedit-' + index;
-            btnUndoEdit.innerText = '↩️ Deshacer Texto';
-            btnUndoEdit.onclick = () => deshacerEdicion(index);
+            // Botón Deshacer
+            const btnUndo = document.createElement('button');
+            btnUndo.className = 'btn-small btn-undo';
+            btnUndo.innerText = '↩️';
+            btnUndo.title = 'Deshacer último cambio';
+            btnUndo.onclick = () => deshacer(index);
             
-            leftDiv.appendChild(label);
-            leftDiv.appendChild(btnUndoBlock);
-            leftDiv.appendChild(btnUndoEdit);
+            // Botón Pegar
+            const btnPaste = document.createElement('button');
+            btnPaste.className = 'btn-small btn-paste';
+            btnPaste.innerText = '📋';
+            btnPaste.title = 'Pegar desde el portapapeles';
+            btnPaste.onclick = () => pegarTexto(index);
             
+            // Botón Borrar Todo
             const btnTrash = document.createElement('button');
-            btnTrash.className = 'btn-trash';
+            btnTrash.className = 'btn-small btn-trash';
             btnTrash.innerText = '🗑️';
+            btnTrash.title = 'Borrar todo el contenido';
             btnTrash.onclick = () => borrarBloqueCompleto(index);
             
+            btnGroup.appendChild(btnUndo);
+            btnGroup.appendChild(btnPaste);
+            btnGroup.appendChild(btnTrash);
+            
+            leftDiv.appendChild(titleWrap);
+            leftDiv.appendChild(btnGroup);
+            
             headerDiv.appendChild(leftDiv);
-            headerDiv.appendChild(btnTrash);
             
             const textarea = document.createElement('textarea');
             textarea.id = 'bloque-' + index;
             textarea.placeholder = 'Pega aquí el contenido...';
             
+            // Cargar guardado
             const saved = localStorage.getItem('jf_block_' + index);
-            if (saved) textarea.value = saved;
+            if (saved) {
+                textarea.value = saved;
+                historial[index] = [saved]; // Iniciar historial
+            } else {
+                historial[index] = [''];
+            }
 
-            // Lógica al escribir
+            // Lógica al escribir o pegar
             textarea.addEventListener('input', (e) => {
-                // Guardar en memoria
                 localStorage.setItem('jf_block_' + index, e.target.value);
                 document.getElementById('status').innerText = 'Guardado automático activo ✔️';
                 
-                // Ocultar botón de restaurar bloque entero (porque ya está escribiendo)
-                document.getElementById('btn-undoblock-' + index).style.display = 'none'; 
-
-                // Lógica para guardar "fotos" del texto y permitir deshacer
-                const btnUndoEdit = document.getElementById('btn-undoedit-' + index);
-                btnUndoEdit.classList.add('active'); // Activar visualmente el botón
-                
-                clearTimeout(timeoutEdicion[index]);
-                timeoutEdicion[index] = setTimeout(() => {
-                    if (!historialEdicion[index]) historialEdicion[index] = [];
-                    // Si el texto actual es diferente al último guardado en el historial
-                    if (historialEdicion[index].length === 0 || historialEdicion[index][historialEdicion[index].length - 1] !== textarea.value) {
-                        historialEdicion[index].push(textarea.value);
-                        if (historialEdicion[index].length > 15) historialEdicion[index].shift(); // Guardar max 15 fotos
+                // Guardar historial con debounce para no saturar memoria
+                clearTimeout(guardandoTimeout[index]);
+                guardandoTimeout[index] = setTimeout(() => {
+                    const valorActual = e.target.value;
+                    const hist = historial[index];
+                    // Si el valor es diferente al último guardado en el historial
+                    if (hist[hist.length - 1] !== valorActual) {
+                        hist.push(valorActual);
+                        if (hist.length > 20) hist.shift(); // Guardar máximo 20 estados
                     }
-                }, 1000); // Guarda una foto cada 1 segundo que dejas de escribir
+                }, 800); // Guarda el estado 0.8 segundos después de dejar de escribir
             });
 
             div.appendChild(headerDiv);
@@ -157,62 +169,56 @@
             container.appendChild(div);
         });
 
-        // --- FUNCIONES DE DESHACER ---
+        // --- FUNCIONES DE LOS BOTONES ---
 
-        function borrarBloqueCompleto(index) {
+        function pegarTexto(index) {
             const textarea = document.getElementById('bloque-' + index);
-            const btnUndoBlock = document.getElementById('btn-undoblock-' + index);
-            
-            if (textarea.value.trim() === '') return; 
-
-            textosBorradosTemporal[index] = textarea.value;
-            textarea.value = '';
-            localStorage.removeItem('jf_block_' + index);
-            
-            // Mostrar botón para recuperar el bloque entero
-            btnUndoBlock.style.display = 'inline-block';
-            // Ocultar botón de deshacer edición por que el campo está vacío
-            document.getElementById('btn-undoedit-' + index).classList.remove('active');
-            
-            document.getElementById('status').innerText = 'Bloque borrado. Toca ↩️ Restaurar para recuperarlo.';
+            navigator.clipboard.readText().then(texto => {
+                if (texto) {
+                    // Guardar estado antes de pegar para poder deshacer
+                    historial[index].push(textarea.value);
+                    textarea.value = texto; // Reemplaza el contenido con lo del portapapeles
+                    localStorage.setItem('jf_block_' + index, texto);
+                    document.getElementById('status').innerText = 'Texto pegado 📋';
+                } else {
+                    alert("El portapapeles está vacío.");
+                }
+            }).catch(err => {
+                alert("No se pudo acceder al portapapeles por seguridad de Chrome. Mantén presionado en la casilla y toca 'Pegar'.");
+            });
         }
 
-        function restaurarBloqueBorrado(index) {
-            const textoRecuperado = textosBorradosTemporal[index];
+        function deshacer(index) {
             const textarea = document.getElementById('bloque-' + index);
-            const btnUndoBlock = document.getElementById('btn-undoblock-' + index);
-
-            if (textoRecuperado !== undefined) {
-                textarea.value = textoRecuperado;
-                localStorage.setItem('jf_block_' + index, textoRecuperado);
-                btnUndoBlock.style.display = 'none'; 
-                document.getElementById('status').innerText = '¡Bloque recuperado con éxito! ✅';
-                
-                // Iniciar el historial de este texto recuperado
-                historialEdicion[index] = [textoRecuperado];
+            const hist = historial[index];
+            
+            if (hist.length > 1) {
+                hist.pop(); // Quita el estado actual
+                const estadoAnterior = hist[hist.length - 1]; // Toma el anterior
+                textarea.value = estadoAnterior;
+                localStorage.setItem('jf_block-' + index, estadoAnterior);
+                document.getElementById('status').innerText = 'Cambio deshecho ↩️';
+            } else {
+                // Si no hay historial (por ejemplo, si recargó), intentamos restaurar el último guardado
+                const guardado = localStorage.getItem('jf_block_' + index) || '';
+                if (textarea.value !== guardado) {
+                     textarea.value = guardado;
+                     document.getElementById('status').innerText = 'Restaurado al último guardado.';
+                } else {
+                     document.getElementById('status').innerText = 'No hay más cambios para deshacer.';
+                }
             }
         }
 
-        function deshacerEdicion(index) {
+        function borrarBloqueCompleto(index) {
             const textarea = document.getElementById('bloque-' + index);
-            const btnUndoEdit = document.getElementById('btn-undoedit-' + index);
+            if (textarea.value.trim() === '') return;
 
-            if (historialEdicion[index] && historialEdicion[index].length > 1) {
-                // Quitamos la foto actual
-                historialEdicion[index].pop();
-                // Tomamos la foto anterior
-                const textoAnterior = historialEdicion[index][historialEdicion[index].length - 1];
-                
-                textarea.value = textoAnterior;
-                localStorage.setItem('jf_block_' + index, textoAnterior);
-                document.getElementById('status').innerText = 'Cambios deshechos ↩️';
-                
-                if (historialEdicion[index].length <= 1) {
-                    btnUndoEdit.classList.remove('active'); // Si ya no hay más, desactivar el botón
-                }
-            } else {
-                document.getElementById('status').innerText = 'No hay más cambios recientes para deshacer.';
-                btnUndoEdit.classList.remove('active');
+            if (confirm('¿Borrar todo el contenido de esta casilla?')) {
+                historial[index].push(textarea.value); // Guardar en historial por si acaso
+                textarea.value = '';
+                localStorage.removeItem('jf_block_' + index);
+                document.getElementById('status').innerText = 'Bloque borrado 🗑️ (Puedes usar ↩️ para recuperarlo).';
             }
         }
 
