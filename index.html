@@ -12,9 +12,9 @@
         p.sub { text-align: center; color: #a1a1aa; font-size: 0.85rem; margin-top: 0; margin-bottom: 20px; }
         
         .block-container { background: #18181b; border: 1px solid #3f3f46; border-radius: 10px; padding: 12px; margin-bottom: 15px; }
-        .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 5px;}
         
-        .header-left { display: flex; align-items: center; gap: 8px; }
+        .header-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;}
         label { font-size: 0.85rem; font-weight: bold; color: #06b6d4; }
         
         .btn-action-small { 
@@ -22,20 +22,24 @@
             border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; font-weight: bold; 
             cursor: pointer; display: none; /* Oculto por defecto */
         }
-        .btn-undo { border-color: #39FF14; color: #39FF14; background: rgba(57, 255, 20, 0.1); }
-        .btn-undo:active { background: #39FF14; color: #000; }
+        .btn-undo-block { border-color: #39FF14; color: #39FF14; background: rgba(57, 255, 20, 0.1); }
+        .btn-undo-block:active { background: #39FF14; color: #000; }
+
+        .btn-undo-edit { border-color: #f59e0b; color: #f59e0b; background: rgba(245, 158, 11, 0.1); opacity: 0.4; pointer-events: none;}
+        .btn-undo-edit.active { opacity: 1; pointer-events: auto; }
+        .btn-undo-edit:active { background: #f59e0b; color: #000; }
 
         .btn-trash { background: rgba(255, 42, 42, 0.15); border: 1px solid #ff2a2a; color: #ff2a2a; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .btn-trash:active { background: #ff2a2a; color: white; }
 
         textarea { 
-            width: 100%; height: 100px; background: #09090b; color: #39FF14; 
+            width: 100%; height: 120px; background: #09090b; color: #39FF14; 
             border: 1px solid #27272a; border-radius: 8px; padding: 10px; 
             font-family: monospace; font-size: 0.8rem; resize: vertical; box-sizing: border-box;
         }
         textarea:focus { outline: none; border-color: #39FF14; }
         
-        .controls { background: #18181b; padding: 15px; border-radius: 12px; position: sticky; bottom: 10px; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); border: 1px solid #39FF14; margin-top: 20px; }
+        .controls { background: #18181b; padding: 15px; border-radius: 12px; position: sticky; bottom: 10px; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); border: 1px solid #39FF14; margin-top: 20px; z-index: 100;}
         input[type="text"] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #3f3f46; background: #09090b; color: white; margin-bottom: 10px; box-sizing: border-box; font-weight: bold; }
         
         .btn-main { width: 100%; padding: 14px; background: #39FF14; color: #051405; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; margin-bottom: 8px; }
@@ -74,8 +78,9 @@
         ];
 
         const container = document.getElementById('blocks-container');
-        // Objeto para guardar el texto antes de borrarlo
-        const textosBorradosTemporal = {};
+        const textosBorradosTemporal = {}; // Para el deshacer de bloque completo
+        const historialEdicion = {}; // Para el deshacer de escritura
+        const timeoutEdicion = {}; // Para agrupar cambios de escritura
 
         BLOQUES.forEach((nombre, index) => {
             const div = document.createElement('div');
@@ -90,39 +95,61 @@
             const label = document.createElement('label');
             label.innerText = nombre;
             
-            // Botón de Deshacer (Oculto al inicio)
-            const btnUndo = document.createElement('button');
-            btnUndo.className = 'btn-action-small btn-undo';
-            btnUndo.id = 'btn-undo-' + index;
-            btnUndo.innerText = '↩️ Deshacer';
-            btnUndo.onclick = () => deshacerBorrado(index);
+            // Botón 1: Deshacer borrado completo (Basurero)
+            const btnUndoBlock = document.createElement('button');
+            btnUndoBlock.className = 'btn-action-small btn-undo-block';
+            btnUndoBlock.id = 'btn-undoblock-' + index;
+            btnUndoBlock.innerText = '↩️ Restaurar';
+            btnUndoBlock.onclick = () => restaurarBloqueBorrado(index);
+            
+            // Botón 2: Deshacer edición de texto (Escritura)
+            const btnUndoEdit = document.createElement('button');
+            btnUndoEdit.className = 'btn-action-small btn-undo-edit';
+            btnUndoEdit.id = 'btn-undoedit-' + index;
+            btnUndoEdit.innerText = '↩️ Deshacer Texto';
+            btnUndoEdit.onclick = () => deshacerEdicion(index);
             
             leftDiv.appendChild(label);
-            leftDiv.appendChild(btnUndo);
+            leftDiv.appendChild(btnUndoBlock);
+            leftDiv.appendChild(btnUndoEdit);
             
-            // Botón de Basura
             const btnTrash = document.createElement('button');
             btnTrash.className = 'btn-trash';
             btnTrash.innerText = '🗑️';
-            btnTrash.title = 'Borrar contenido';
-            btnTrash.onclick = () => borrarBloque(index);
+            btnTrash.onclick = () => borrarBloqueCompleto(index);
             
             headerDiv.appendChild(leftDiv);
             headerDiv.appendChild(btnTrash);
             
             const textarea = document.createElement('textarea');
             textarea.id = 'bloque-' + index;
-            textarea.placeholder = 'Pega aquí el contenido de ' + nombre;
+            textarea.placeholder = 'Pega aquí el contenido...';
             
             const saved = localStorage.getItem('jf_block_' + index);
             if (saved) textarea.value = saved;
 
-            // Al escribir, guardar y ocultar el botón de deshacer
+            // Lógica al escribir
             textarea.addEventListener('input', (e) => {
+                // Guardar en memoria
                 localStorage.setItem('jf_block_' + index, e.target.value);
                 document.getElementById('status').innerText = 'Guardado automático activo ✔️';
-                // Si el usuario escribe, ya no tiene sentido el botón deshacer
-                document.getElementById('btn-undo-' + index).style.display = 'none'; 
+                
+                // Ocultar botón de restaurar bloque entero (porque ya está escribiendo)
+                document.getElementById('btn-undoblock-' + index).style.display = 'none'; 
+
+                // Lógica para guardar "fotos" del texto y permitir deshacer
+                const btnUndoEdit = document.getElementById('btn-undoedit-' + index);
+                btnUndoEdit.classList.add('active'); // Activar visualmente el botón
+                
+                clearTimeout(timeoutEdicion[index]);
+                timeoutEdicion[index] = setTimeout(() => {
+                    if (!historialEdicion[index]) historialEdicion[index] = [];
+                    // Si el texto actual es diferente al último guardado en el historial
+                    if (historialEdicion[index].length === 0 || historialEdicion[index][historialEdicion[index].length - 1] !== textarea.value) {
+                        historialEdicion[index].push(textarea.value);
+                        if (historialEdicion[index].length > 15) historialEdicion[index].shift(); // Guardar max 15 fotos
+                    }
+                }, 1000); // Guarda una foto cada 1 segundo que dejas de escribir
             });
 
             div.appendChild(headerDiv);
@@ -130,37 +157,66 @@
             container.appendChild(div);
         });
 
-        function borrarBloque(index) {
-            const textarea = document.getElementById('bloque-' + index);
-            const btnUndo = document.getElementById('btn-undo-' + index);
-            
-            if (textarea.value.trim() === '') return; // Si ya está vacío, no hace nada
+        // --- FUNCIONES DE DESHACER ---
 
-            // Guardamos el texto en memoria temporal
-            textosBorradosTemporal[index] = textarea.value;
+        function borrarBloqueCompleto(index) {
+            const textarea = document.getElementById('bloque-' + index);
+            const btnUndoBlock = document.getElementById('btn-undoblock-' + index);
             
-            // Borramos el textarea y el storage
+            if (textarea.value.trim() === '') return; 
+
+            textosBorradosTemporal[index] = textarea.value;
             textarea.value = '';
             localStorage.removeItem('jf_block_' + index);
             
-            // Mostramos el botón de deshacer
-            btnUndo.style.display = 'inline-block';
-            document.getElementById('status').innerText = 'Bloque borrado. Toca ↩️ Deshacer para recuperar.';
+            // Mostrar botón para recuperar el bloque entero
+            btnUndoBlock.style.display = 'inline-block';
+            // Ocultar botón de deshacer edición por que el campo está vacío
+            document.getElementById('btn-undoedit-' + index).classList.remove('active');
+            
+            document.getElementById('status').innerText = 'Bloque borrado. Toca ↩️ Restaurar para recuperarlo.';
         }
 
-        function deshacerBorrado(index) {
+        function restaurarBloqueBorrado(index) {
             const textoRecuperado = textosBorradosTemporal[index];
             const textarea = document.getElementById('bloque-' + index);
-            const btnUndo = document.getElementById('btn-undo-' + index);
+            const btnUndoBlock = document.getElementById('btn-undoblock-' + index);
 
             if (textoRecuperado !== undefined) {
                 textarea.value = textoRecuperado;
                 localStorage.setItem('jf_block_' + index, textoRecuperado);
-                btnUndo.style.display = 'none'; // Ocultamos el botón otra vez
-                document.getElementById('status').innerText = '¡Texto recuperado con éxito! ✅';
+                btnUndoBlock.style.display = 'none'; 
+                document.getElementById('status').innerText = '¡Bloque recuperado con éxito! ✅';
+                
+                // Iniciar el historial de este texto recuperado
+                historialEdicion[index] = [textoRecuperado];
             }
         }
 
+        function deshacerEdicion(index) {
+            const textarea = document.getElementById('bloque-' + index);
+            const btnUndoEdit = document.getElementById('btn-undoedit-' + index);
+
+            if (historialEdicion[index] && historialEdicion[index].length > 1) {
+                // Quitamos la foto actual
+                historialEdicion[index].pop();
+                // Tomamos la foto anterior
+                const textoAnterior = historialEdicion[index][historialEdicion[index].length - 1];
+                
+                textarea.value = textoAnterior;
+                localStorage.setItem('jf_block_' + index, textoAnterior);
+                document.getElementById('status').innerText = 'Cambios deshechos ↩️';
+                
+                if (historialEdicion[index].length <= 1) {
+                    btnUndoEdit.classList.remove('active'); // Si ya no hay más, desactivar el botón
+                }
+            } else {
+                document.getElementById('status').innerText = 'No hay más cambios recientes para deshacer.';
+                btnUndoEdit.classList.remove('active');
+            }
+        }
+
+        // --- FUNCIONES DE DESCARGA ---
         function descargarHTML() {
             const nombreInput = document.getElementById('filename').value.trim() || 'index';
             let contenidoFinal = '';
@@ -171,7 +227,7 @@
             }
 
             if (!contenidoFinal) {
-                alert("Las casillas están vacías. Pega el código primero.");
+                alert("Las casillas están vacías.");
                 return;
             }
 
@@ -185,12 +241,12 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            document.getElementById('status').innerText = '¡Archivo HTML descargado con éxito!';
+            document.getElementById('status').innerText = '¡Archivo HTML descargado!';
         }
 
         async function descargarZIP() {
             if (typeof JSZip === 'undefined') {
-                alert("La librería ZIP no se ha cargado. Verifica tu conexión a internet.");
+                alert("La librería ZIP no se ha cargado.");
                 return;
             }
 
@@ -207,11 +263,11 @@
             }
 
             if (!hayDatos) {
-                alert("No hay texto guardado en las casillas para comprimir.");
+                alert("No hay texto guardado.");
                 return;
             }
 
-            document.getElementById('status').innerText = 'Creando archivo ZIP... ⏳';
+            document.getElementById('status').innerText = 'Creando ZIP... ⏳';
 
             try {
                 const content = await zip.generateAsync({ type: "blob" });
@@ -223,9 +279,9 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                document.getElementById('status').innerText = '¡ZIP descargado con éxito! ✅';
+                document.getElementById('status').innerText = '¡ZIP descargado! ✅';
             } catch (error) {
-                alert("Hubo un error al crear el ZIP: " + error.message);
+                alert("Error al crear ZIP: " + error.message);
             }
         }
     </script>
