@@ -12,7 +12,6 @@
         p.sub { text-align: center; color: #a1a1aa; font-size: 0.85rem; margin-top: 0; margin-bottom: 20px; }
         
         .block-container { background: #18181b; border: 1px solid #3f3f46; border-radius: 10px; padding: 12px; margin-bottom: 15px; transition: border-color 0.3s, box-shadow 0.3s; }
-        /* Clase para cuando hay un error en la casilla */
         .block-container.block-error { border-color: #ff2a2a !important; box-shadow: 0 0 10px rgba(255, 42, 42, 0.4); }
 
         .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;}
@@ -93,7 +92,7 @@
         BLOQUES.forEach((nombre, index) => {
             const div = document.createElement('div');
             div.className = 'block-container';
-            div.id = 'container-' + index; // ID para identificar el bloque visualmente
+            div.id = 'container-' + index; 
             
             const headerDiv = document.createElement('div');
             headerDiv.className = 'block-header';
@@ -151,8 +150,6 @@
             textarea.addEventListener('input', (e) => {
                 localStorage.setItem('jf_block_' + index, e.target.value);
                 document.getElementById('status').innerText = 'Guardado automático activo ✔️';
-                
-                // Quitar el borde rojo si estaba en error
                 div.classList.remove('block-error');
 
                 clearTimeout(guardandoTimeout[index]);
@@ -171,6 +168,7 @@
             container.appendChild(div);
         });
 
+        // --- FUNCIONES DE LOS BOTONES ---
         function pegarTexto(index) {
             const textarea = document.getElementById('bloque-' + index);
             navigator.clipboard.readText().then(texto => {
@@ -223,33 +221,39 @@
             }
         }
 
-        // --- VALIDACIÓN CASILLA POR CASILLA ---
+        // --- VALIDACIÓN INTELIGENTE (Ignora textos y comentarios) ---
         function validarCodigoPorBloques() {
             let bloquesConError = [];
             let bloquesVacios = 0;
 
-            // Primero, limpiamos todos los bordes rojos anteriores
             document.querySelectorAll('.block-container').forEach(el => el.classList.remove('block-error'));
 
             for (let i = 0; i < BLOQUES.length; i++) {
-                const textarea = document.getElementById('bloque-' + i);
-                const txt = textarea.value;
-                const containerBlock = document.getElementById('container-' + i);
-
+                let txt = document.getElementById('bloque-' + i).value;
+                
                 if (txt.trim() === '') {
                     bloquesVacios++;
-                    continue; // Si está vacío, pasamos al siguiente
+                    continue; 
                 }
 
-                // Contadores
-                const openParens = (txt.match(/\(/g) || []).length;
-                const closeParens = (txt.match(/\)/g) || []).length;
+                // 1. Limpiar el texto: quitar comentarios HTML, JS y CSS
+                let textLimpio = txt.replace(/<!--[\s\S]*?-->/g, '') // Comentarios HTML <!-- -->
+                                  .replace(/\/\*[\s\S]*?\*\//g, '')  // Comentarios CSS/JS /* */
+                                  .replace(/\/\/.*$/gm, '');         // Comentarios JS //
+
+                // 2. Quitar textos entre comillas (simples, dobles y backticks)
+                // Esto evita que un paréntesis dentro de un string cuente como error.
+                textLimpio = textLimpio.replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '""');
+
+                // 3. Contar solo los caracteres reales
+                const openParens = (textLimpio.match(/\(/g) || []).length;
+                const closeParens = (textLimpio.match(/\)/g) || []).length;
                 
-                const openBraces = (txt.match(/\{/g) || []).length;
-                const closeBraces = (txt.match(/\}/g) || []).length;
+                const openBraces = (textLimpio.match(/\{/g) || []).length;
+                const closeBraces = (textLimpio.match(/\}/g) || []).length;
                 
-                const openBrackets = (txt.match(/\[/g) || []).length;
-                const closeBrackets = (txt.match(/\]/g) || []).length;
+                const openBrackets = (textLimpio.match(/\[/g) || []).length;
+                const closeBrackets = (textLimpio.match(/\]/g) || []).length;
 
                 let errorEnBloque = false;
 
@@ -259,18 +263,17 @@
 
                 if (errorEnBloque) {
                     bloquesConError.push(i + 1);
-                    containerBlock.classList.add('block-error'); // Pintar de rojo
+                    document.getElementById('container-' + i).classList.add('block-error');
                 }
             }
 
             const statusEl = document.getElementById('status');
 
             if (bloquesConError.length > 0) {
-                // Hacemos scroll al primer bloque con error
                 const primerError = bloquesConError[0] - 1;
                 document.getElementById('container-' + primerError).scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                alert(`🚨 SE DETECTARON ERRORES EN LOS BLOQUES:\n\n${bloquesConError.join(', ')}\n\nLas casillas con el borde rojo tienen llaves { }, paréntesis ( ) o corchetes [ ] desbalanceados. Revisa si borraste una línea por accidente.`);
+                alert(`🚨 SE DETECTARON ERRORES EN LOS BLOQUES:\n\n${bloquesConError.join(', ')}\n\nLas casillas con el borde rojo tienen llaves { }, paréntesis ( ) o corchetes [ ] desbalanceados en el código real. Revisa si borraste alguna línea.`);
                 statusEl.innerText = 'Validación fallida ❌ (Revisa los bordes rojos)';
                 statusEl.style.color = '#ff2a2a';
             } else if (bloquesVacios === BLOQUES.length) {
@@ -278,7 +281,7 @@
                 statusEl.innerText = 'Casillas vacías.';
                 statusEl.style.color = '#a1a1aa';
             } else {
-                alert("✅ ¡TODO PARECE ESTAR BIEN!\n\nNo se detectaron llaves, paréntesis ni corchetes desbalanceados en ninguna casilla.");
+                alert("✅ ¡TODO PARECE ESTAR BIEN!\n\nNo se detectaron errores en el código (ignorando textos y comentarios).");
                 statusEl.innerText = 'Código validado ✔️ (Todo en orden)';
                 statusEl.style.color = '#39FF14';
             }
@@ -309,6 +312,7 @@
             URL.revokeObjectURL(url);
             
             document.getElementById('status').innerText = '¡Archivo HTML descargado!';
+            document.getElementById('status').style.color = '#a1a1aa';
         }
 
         async function descargarZIP() {
