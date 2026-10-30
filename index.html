@@ -47,8 +47,11 @@
         .btn-main { width: 100%; padding: 14px; background: #39FF14; color: #051405; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; margin-bottom: 8px; }
         .btn-main:active { background: #2cc20e; }
         
-        .btn-secondary { width: 100%; padding: 14px; background: #06b6d4; color: #041a1f; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; }
+        .btn-secondary { width: 100%; padding: 14px; background: #06b6d4; color: #041a1f; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; margin-bottom: 8px;}
         .btn-secondary:active { background: #0891b2; }
+
+        .btn-validate { width: 100%; padding: 14px; background: #f59e0b; color: #041a0b; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; }
+        .btn-validate:active { background: #d97706; }
         
         .save-status { color: #a1a1aa; font-size: 0.75rem; text-align: center; margin-top: 8px; }
     </style>
@@ -66,6 +69,7 @@
         
         <button class="btn-main" onclick="descargarHTML()">⬇️ Descargar Index Completo</button>
         <button class="btn-secondary" onclick="descargarZIP()">📦 Descargar ZIP con los .txt</button>
+        <button class="btn-validate" onclick="validarCodigo()">🔍 Validar Código</button>
         
         <div class="save-status" id="status">Esperando texto...</div>
     </div>
@@ -80,7 +84,6 @@
         ];
 
         const container = document.getElementById('blocks-container');
-        // Historial para deshacer ediciones
         const historial = {};
         const guardandoTimeout = {};
 
@@ -103,21 +106,18 @@
             const btnGroup = document.createElement('div');
             btnGroup.className = 'btn-group';
             
-            // Botón Deshacer
             const btnUndo = document.createElement('button');
             btnUndo.className = 'btn-small btn-undo';
             btnUndo.innerText = '↩️';
             btnUndo.title = 'Deshacer último cambio';
             btnUndo.onclick = () => deshacer(index);
             
-            // Botón Pegar
             const btnPaste = document.createElement('button');
             btnPaste.className = 'btn-small btn-paste';
             btnPaste.innerText = '📋';
             btnPaste.title = 'Pegar desde el portapapeles';
             btnPaste.onclick = () => pegarTexto(index);
             
-            // Botón Borrar Todo
             const btnTrash = document.createElement('button');
             btnTrash.className = 'btn-small btn-trash';
             btnTrash.innerText = '🗑️';
@@ -137,31 +137,27 @@
             textarea.id = 'bloque-' + index;
             textarea.placeholder = 'Pega aquí el contenido...';
             
-            // Cargar guardado
             const saved = localStorage.getItem('jf_block_' + index);
             if (saved) {
                 textarea.value = saved;
-                historial[index] = [saved]; // Iniciar historial
+                historial[index] = [saved];
             } else {
                 historial[index] = [''];
             }
 
-            // Lógica al escribir o pegar
             textarea.addEventListener('input', (e) => {
                 localStorage.setItem('jf_block_' + index, e.target.value);
                 document.getElementById('status').innerText = 'Guardado automático activo ✔️';
                 
-                // Guardar historial con debounce para no saturar memoria
                 clearTimeout(guardandoTimeout[index]);
                 guardandoTimeout[index] = setTimeout(() => {
                     const valorActual = e.target.value;
                     const hist = historial[index];
-                    // Si el valor es diferente al último guardado en el historial
                     if (hist[hist.length - 1] !== valorActual) {
                         hist.push(valorActual);
-                        if (hist.length > 20) hist.shift(); // Guardar máximo 20 estados
+                        if (hist.length > 20) hist.shift();
                     }
-                }, 800); // Guarda el estado 0.8 segundos después de dejar de escribir
+                }, 800);
             });
 
             div.appendChild(headerDiv);
@@ -169,15 +165,12 @@
             container.appendChild(div);
         });
 
-        // --- FUNCIONES DE LOS BOTONES ---
-
         function pegarTexto(index) {
             const textarea = document.getElementById('bloque-' + index);
             navigator.clipboard.readText().then(texto => {
                 if (texto) {
-                    // Guardar estado antes de pegar para poder deshacer
                     historial[index].push(textarea.value);
-                    textarea.value = texto; // Reemplaza el contenido con lo del portapapeles
+                    textarea.value = texto;
                     localStorage.setItem('jf_block_' + index, texto);
                     document.getElementById('status').innerText = 'Texto pegado 📋';
                 } else {
@@ -193,13 +186,12 @@
             const hist = historial[index];
             
             if (hist.length > 1) {
-                hist.pop(); // Quita el estado actual
-                const estadoAnterior = hist[hist.length - 1]; // Toma el anterior
+                hist.pop();
+                const estadoAnterior = hist[hist.length - 1];
                 textarea.value = estadoAnterior;
                 localStorage.setItem('jf_block-' + index, estadoAnterior);
                 document.getElementById('status').innerText = 'Cambio deshecho ↩️';
             } else {
-                // Si no hay historial (por ejemplo, si recargó), intentamos restaurar el último guardado
                 const guardado = localStorage.getItem('jf_block_' + index) || '';
                 if (textarea.value !== guardado) {
                      textarea.value = guardado;
@@ -215,14 +207,78 @@
             if (textarea.value.trim() === '') return;
 
             if (confirm('¿Borrar todo el contenido de esta casilla?')) {
-                historial[index].push(textarea.value); // Guardar en historial por si acaso
+                historial[index].push(textarea.value);
                 textarea.value = '';
                 localStorage.removeItem('jf_block_' + index);
                 document.getElementById('status').innerText = 'Bloque borrado 🗑️ (Puedes usar ↩️ para recuperarlo).';
             }
         }
 
-        // --- FUNCIONES DE DESCARGA ---
+        function validarCodigo() {
+            let fullText = "";
+            for (let i = 0; i < BLOQUES.length; i++) {
+                fullText += document.getElementById('bloque-' + i).value + '\n';
+            }
+
+            if (fullText.trim() === '') {
+                alert("Las casillas están vacías. Pega el código primero.");
+                return;
+            }
+
+            let errores = [];
+
+            // 1. Contar llaves { }
+            const openBraces = (fullText.match(/\{/g) || []).length;
+            const closeBraces = (fullText.match(/\}/g) || []).length;
+            if (openBraces !== closeBraces) {
+                errores.push(`⚠️ Llaves { }: Hay ${openBraces} de apertura y ${closeBraces} de cierre. (Están desbalanceadas)`);
+            }
+
+            // 2. Contar paréntesis ( )
+            const openParens = (fullText.match(/\(/g) || []).length;
+            const closeParens = (fullText.match(/\)/g) || []).length;
+            if (openParens !== closeParens) {
+                errores.push(`⚠️ Paréntesis ( ): Hay ${openParens} de apertura y ${closeParens} de cierre. (Están desbalanceados)`);
+            }
+
+            // 3. Contar corchetes [ ]
+            const openBrackets = (fullText.match(/\[/g) || []).length;
+            const closeBrackets = (fullText.match(/\]/g) || []).length;
+            if (openBrackets !== closeBrackets) {
+                errores.push(`⚠️ Corchetes [ ]: Hay ${openBrackets} de apertura y ${closeBrackets} de cierre. (Están desbalanceados)`);
+            }
+
+            // 4. Revisar etiquetas HTML vitales
+            if (!fullText.includes('<html') || !fullText.includes('</html>')) {
+                errores.push("⚠️ Falta la etiqueta <html> o </html>.");
+            }
+            if (!fullText.includes('<head>') || !fullText.includes('</head>')) {
+                errores.push("⚠️ Falta la etiqueta <head> o </head>.");
+            }
+            if (!fullText.includes('<body>') || !fullText.includes('</body>')) {
+                errores.push("⚠️ Falta la etiqueta <body> o </body>.");
+            }
+
+            // 5. Revisar etiquetas script
+            const scOpen = (fullText.match(/<script/g) || []).length;
+            const scClose = (fullText.match(/<\/script>/g) || []).length;
+            if (scOpen !== scClose) {
+                errores.push(`⚠️ Etiquetas <script>: Hay ${scOpen} de apertura y ${scClose} de cierre.`);
+            }
+
+            const statusEl = document.getElementById('status');
+
+            if (errores.length > 0) {
+                alert("🚨 SE DETECTARON POSIBLES ERRORES:\n\n" + errores.join("\n\n") + "\n\nEsto suele pasar cuando se mueve o borra una línea por accidente. Por favor, revisa tu código.");
+                statusEl.innerText = 'Validación fallida ❌';
+                statusEl.style.color = '#ff2a2a';
+            } else {
+                alert("✅ ¡TODO PARECE ESTAR BIEN!\n\nLas llaves, paréntesis y etiquetas principales están balanceadas. Parece que no falta ninguna línea.");
+                statusEl.innerText = 'Código validado ✔️';
+                statusEl.style.color = '#39FF14';
+            }
+        }
+
         function descargarHTML() {
             const nombreInput = document.getElementById('filename').value.trim() || 'index';
             let contenidoFinal = '';
@@ -248,6 +304,7 @@
             URL.revokeObjectURL(url);
             
             document.getElementById('status').innerText = '¡Archivo HTML descargado!';
+            document.getElementById('status').style.color = '#a1a1aa';
         }
 
         async function descargarZIP() {
@@ -274,6 +331,7 @@
             }
 
             document.getElementById('status').innerText = 'Creando ZIP... ⏳';
+            document.getElementById('status').style.color = '#a1a1aa';
 
             try {
                 const content = await zip.generateAsync({ type: "blob" });
