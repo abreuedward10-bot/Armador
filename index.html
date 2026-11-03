@@ -2,281 +2,407 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Armador de Index - Jennyfit</title>
-    <!-- Librería para crear el ZIP -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Montador Jennyfit</title>
+    
+    <!-- Etiquetas para que funcione como App (PWA) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b0d0c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        body { background-color: #0b0d0c; color: #f4f4f5; font-family: system-ui, sans-serif; padding: 15px; margin: 0; }
-        h1 { color: #39FF14; font-size: 1.5rem; text-align: center; margin-bottom: 5px; }
-        p.sub { text-align: center; color: #a1a1aa; font-size: 0.85rem; margin-top: 0; margin-bottom: 20px; }
+        :root { --verde: #39FF14; --fondo: #0b0d0c; --caja: #18181b; --borde: #3f3f46; }
+        /* Ajuste para que los botones no tapen la barra de gestos de Android */
+        body { background-color: var(--fondo); color: #f4f4f5; font-family: system-ui, sans-serif; padding: 10px; margin: 0; padding-bottom: calc(250px + env(safe-area-inset-bottom)); }
+        h1 { color: var(--verde); font-size: 1.3rem; text-align: center; margin-bottom: 5px; }
+        p.sub { text-align: center; color: #a1a1aa; font-size: 0.8rem; margin-top: 0; margin-bottom: 15px; }
         
-        .block-container { background: #18181b; border: 1px solid #3f3f46; border-radius: 10px; padding: 12px; margin-bottom: 15px; transition: border-color 0.3s, box-shadow 0.3s; }
+        .upload-zone { background: #18181b; border: 2px dashed #8b5cf6; border-radius: 10px; padding: 15px; margin-bottom: 15px; text-align: center; }
+        .upload-zone h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #a1a1aa; }
+        .btn-upload { display: inline-block; width: 100%; padding: 12px; background: #8b5cf6; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; box-sizing: border-box; margin-bottom: 8px; font-size: 0.9rem; }
+        .btn-folder { background: #06b6d4; color: #000; }
+        input[type="file"] { display: none; }
 
-        .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;}
-        
-        .header-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; justify-content: space-between;}
-        .title-wrap { display: flex; align-items: center; gap: 8px; }
-        label { font-size: 0.85rem; font-weight: bold; color: #06b6d4; }
-        
-        .btn-group { display: flex; gap: 4px; }
-        .btn-small { 
-            background: rgba(255, 255, 255, 0.1); border: 1px solid #52525b; color: #fff; 
-            border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: bold; 
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-        }
-        
-        .btn-undo { border-color: #f59e0b; color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
-        .btn-undo:active { background: #f59e0b; color: #000; }
-        
-        .btn-paste { border-color: #06b6d4; color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
-        .btn-paste:active { background: #06b6d4; color: #000; }
-
-        .btn-trash { border-color: #ff2a2a; color: #ff2a2a; background: rgba(255, 42, 42, 0.15); }
-        .btn-trash:active { background: #ff2a2a; color: white; }
+        details { background: var(--caja); border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        details[open] { border-color: var(--verde); box-shadow: 0 0 10px rgba(57, 255, 20, 0.1); }
+        summary { padding: 12px; font-size: 0.85rem; font-weight: bold; color: var(--verde); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        summary::-webkit-details-marker { display: none; }
+        summary::after { content: '▼ Editar'; color: #a1a1aa; font-size: 0.7rem; font-weight: normal; }
+        details[open] summary::after { content: '▲ Cerrar'; }
 
         textarea { 
-            width: 100%; height: 120px; background: #09090b; color: #39FF14; 
-            border: 1px solid #27272a; border-radius: 8px; padding: 10px; 
-            font-family: monospace; font-size: 0.8rem; resize: vertical; box-sizing: border-box;
+            width: 100%; height: 150px; background: #09090b; color: var(--verde); 
+            border: none; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde);
+            padding: 10px; font-family: monospace; font-size: 0.8rem; resize: vertical; box-sizing: border-box;
         }
-        textarea:focus { outline: none; border-color: #39FF14; }
+        textarea:focus { outline: none; }
         
-        .controls { background: #18181b; padding: 15px; border-radius: 12px; position: sticky; bottom: 10px; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); border: 1px solid #39FF14; margin-top: 20px; z-index: 100;}
-        input[type="text"] { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #3f3f46; background: #09090b; color: white; margin-bottom: 10px; box-sizing: border-box; font-weight: bold; }
+        .box-tools { display: flex; gap: 5px; padding: 10px; background: #121214; }
+        .box-tools button { flex: 1; padding: 12px 5px; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; color: white; }
+        .btn-paste { background: #06b6d4; color: #000 !important; }
+        .btn-undo { background: #f59e0b; color: #000 !important; }
+        .btn-clear { background: #ef4444; }
+
+        /* Controles inferiores anclados con margen de seguridad */
+        .controls { background: var(--caja); padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); position: fixed; bottom: 0; left: 0; right: 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.9); border-top: 1px solid var(--verde); z-index: 100; }
+        .progress-bar { width: 100%; height: 5px; background: #27272a; border-radius: 3px; margin-bottom: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--verde); width: 0%; transition: 0.3s; }
+        .status-text { font-size: 0.75rem; color: #a1a1aa; text-align: center; margin-bottom: 8px; display: block; font-weight: bold; }
         
-        .btn-main { width: 100%; padding: 14px; background: #39FF14; color: #051405; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; margin-bottom: 8px; }
-        .btn-main:active { background: #2cc20e; }
+        input[type="text"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--borde); background: #09090b; color: white; box-sizing: border-box; font-size: 0.9rem; margin-bottom: 8px; text-align: center; }
         
-        .btn-secondary { width: 100%; padding: 14px; background: #06b6d4; color: #041a1f; border: none; border-radius: 8px; font-size: 1rem; font-weight: 900; cursor: pointer; text-transform: uppercase; margin-bottom: 8px;}
-        .btn-secondary:active { background: #0891b2; }
+        .btn-group { display: flex; gap: 6px; margin-bottom: 6px; }
+        .btn-group:last-child { margin-bottom: 0; }
+        .btn-group button { flex: 1; padding: 12px 5px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 900; cursor: pointer; text-transform: uppercase; }
+        .btn-main { background: var(--verde); color: #051405; }
+        .btn-zip { background: #8b5cf6; color: white; }
+        .btn-save { background: #eab308; color: #000; }
+        .btn-secondary { background: #3f3f46; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
         
-        .save-status { color: #a1a1aa; font-size: 0.75rem; text-align: center; margin-top: 8px; }
+        #empty-msg { text-align: center; color: #a1a1aa; margin-top: 20px; font-size: 0.9rem; display: none; }
+        .ultimo-archivo { color: #f59e0b !important; background: #2a1f05; border-bottom: 2px solid #f59e0b; }
     </style>
 </head>
 <body>
 
-    <h1>Armador de Index</h1>
-    <p class="sub">Pega cada bloque en su casilla. Se guarda automáticamente.</p>
+    <h1>Montador Jennyfit</h1>
+    <p class="sub">Sube tus archivos. Se ordenarán solos.</p>
+
+    <div class="upload-zone">
+        <h3>OPCIÓN 1: Recomendada (Sube un .ZIP)</h3>
+        <label class="btn-upload" for="zip-input">🗜️ Cargar archivo .ZIP</label>
+        <input type="file" id="zip-input" accept=".zip">
+        
+        <h3 style="margin-top: 15px;">OPCIÓN 2: Subir Carpeta</h3>
+        <label class="btn-upload btn-folder" for="folder-input">📁 Seleccionar Carpeta</label>
+        <input type="file" id="folder-input" webkitdirectory directory multiple>
+    </div>
 
     <div id="blocks-container"></div>
+    <div id="empty-msg">No hay archivos cargados. Sube un .ZIP o una Carpeta.</div>
 
     <div class="controls">
-        <label style="color:#39FF14;">Nombre del archivo final:</label>
-        <input type="text" id="filename" value="index" placeholder="Ej: index">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <span class="status-text" id="status-text">Listo para trabajar</span>
         
-        <button class="btn-main" onclick="descargarHTML()">⬇️ Descargar Index Completo</button>
-        <button class="btn-secondary" onclick="descargarZIP()">📦 Descargar ZIP con los .txt</button>
+        <input type="text" id="filename" value="index" placeholder="Nombre del archivo final">
         
-        <div class="save-status" id="status">Esperando texto...</div>
+        <div class="btn-group">
+            <button class="btn-main" onclick="descargarHTML()">⬇️ Bajar HTML</button>
+            <button class="btn-zip" onclick="descargarZIP()">📦 Bajar ZIP</button>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn-save" onclick="exportarProyecto()">💾 Guardar Progreso</button>
+            <button class="btn-secondary" onclick="document.getElementById('json-input').click()">📂 Cargar Progreso</button>
+            <input type="file" id="json-input" accept=".json" style="display:none" onchange="importarProyecto(event)">
+            <button class="btn-danger" onclick="resetearTodo()" style="flex: 0.5;">🗑️</button>
+        </div>
     </div>
 
     <script>
-        const BLOQUES = [
-            "1. sbloqueantesdetodos.txt", "2. bloque2A.txt", "3. bloque2b.txt", "4. bloque2C.txt", "5. bloque2D.txt",
-            "6. bloquepegardespuesdebloqueantesdetodosytodoslosbloques2.txt", "7. bloque1A.txt", "8. bloque1B.txt",
-            "9. bloque1c.txt", "10. bloque1d.txt", "11. bloque3A.txt", "12. bloque3B.txt", "13. bloque3C.txt",
-            "14. bloque4A.txt", "15. bloque4B.txt", "16. bloque4CA.txt", "17. bloque4CB.txt", "18. bloque5A.txt",
-            "19. bloque5b.txt", "20. bloque5C.txt", "21. bloque5D.txt", "22. bloque5E.txt", "23. bloque6A.txt", "24. bloque6B.txt"
-        ];
-
-        const container = document.getElementById('blocks-container');
-        const historial = {};
-        const guardandoTimeout = {};
-
-        BLOQUES.forEach((nombre, index) => {
-            const div = document.createElement('div');
-            div.className = 'block-container';
-            div.id = 'container-' + index; 
-            
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'block-header';
-            
-            const leftDiv = document.createElement('div');
-            leftDiv.className = 'header-left';
-            
-            const titleWrap = document.createElement('div');
-            titleWrap.className = 'title-wrap';
-            const label = document.createElement('label');
-            label.innerText = nombre;
-            titleWrap.appendChild(label);
-            
-            const btnGroup = document.createElement('div');
-            btnGroup.className = 'btn-group';
-            
-            const btnUndo = document.createElement('button');
-            btnUndo.className = 'btn-small btn-undo';
-            btnUndo.innerText = '↩️';
-            btnUndo.title = 'Deshacer último cambio';
-            btnUndo.onclick = () => deshacer(index);
-            
-            const btnPaste = document.createElement('button');
-            btnPaste.className = 'btn-small btn-paste';
-            btnPaste.innerText = '📋';
-            btnPaste.title = 'Pegar desde el portapapeles';
-            btnPaste.onclick = () => pegarTexto(index);
-            
-            const btnTrash = document.createElement('button');
-            btnTrash.className = 'btn-small btn-trash';
-            btnTrash.innerText = '🗑️';
-            btnTrash.title = 'Borrar todo el contenido';
-            btnTrash.onclick = () => borrarBloqueCompleto(index);
-            
-            btnGroup.appendChild(btnUndo);
-            btnGroup.appendChild(btnPaste);
-            btnGroup.appendChild(btnTrash);
-            
-            leftDiv.appendChild(titleWrap);
-            leftDiv.appendChild(btnGroup);
-            headerDiv.appendChild(leftDiv);
-            
-            const textarea = document.createElement('textarea');
-            textarea.id = 'bloque-' + index;
-            textarea.placeholder = 'Pega aquí el contenido...';
-            
-            const saved = localStorage.getItem('jf_block_' + index);
-            if (saved) {
-                textarea.value = saved;
-                historial[index] = [saved];
-            } else {
-                historial[index] = [''];
-            }
-
-            textarea.addEventListener('input', (e) => {
-                localStorage.setItem('jf_block_' + index, e.target.value);
-                document.getElementById('status').innerText = 'Guardado automático activo ✔️';
-
-                clearTimeout(guardandoTimeout[index]);
-                guardandoTimeout[index] = setTimeout(() => {
-                    const valorActual = e.target.value;
-                    const hist = historial[index];
-                    if (hist[hist.length - 1] !== valorActual) {
-                        hist.push(valorActual);
-                        if (hist.length > 20) hist.shift();
-                    }
-                }, 800);
+        // --- REGISTRO DE LA APP (PWA) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('App lista para funcionar offline'))
+                    .catch(err => console.log('Error al registrar App:', err));
             });
+        }
 
-            div.appendChild(headerDiv);
-            div.appendChild(textarea);
-            container.appendChild(div);
+        let bloquesActuales = []; 
+        const container = document.getElementById('blocks-container');
+        const emptyMsg = document.getElementById('empty-msg');
+        let db;
+
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+        const request = indexedDB.open("MontadorDB", 7); 
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            if (!db.objectStoreNames.contains("estado")) db.createObjectStore("estado");
+        };
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            cargarDesdeDB();
+        };
+
+        function renderizar() {
+            container.innerHTML = '';
+            
+            if (bloquesActuales.length === 0) {
+                emptyMsg.style.display = 'block';
+                actualizarProgreso();
+                return;
+            }
+            
+            emptyMsg.style.display = 'none';
+            bloquesActuales.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true, sensitivity: 'base' }));
+
+            bloquesActuales.forEach((bloque, i) => {
+                const details = document.createElement('details');
+                details.id = 'container-' + i;
+                
+                const summary = document.createElement('summary');
+                const esElUltimo = (i === bloquesActuales.length - 1);
+                
+                if (esElUltimo) {
+                    summary.classList.add('ultimo-archivo');
+                    summary.innerText = `[${i + 1}] ${bloque.nombre} 👈 ÚLTIMO`;
+                } else {
+                    summary.innerText = `[${i + 1}] ${bloque.nombre}`;
+                }
+                
+                const textarea = document.createElement('textarea');
+                textarea.value = bloque.contenido;
+                
+                textarea.addEventListener('input', (e) => {
+                    bloque.contenido = e.target.value;
+                    guardarEnDB();
+                    actualizarProgreso();
+                });
+
+                const tools = document.createElement('div');
+                tools.className = 'box-tools';
+
+                const btnPaste = document.createElement('button');
+                btnPaste.className = 'btn-paste';
+                btnPaste.innerText = '📋 Pegar';
+                btnPaste.onclick = async () => {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        textarea.focus(); 
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        textarea.value = textarea.value.substring(0, start) + text + textarea.value.substring(end);
+                        textarea.dispatchEvent(new Event('input'));
+                    } catch (err) {
+                        alert("Mantén presionado dentro del texto y selecciona 'Pegar'.");
+                    }
+                };
+
+                const btnUndo = document.createElement('button');
+                btnUndo.className = 'btn-undo';
+                btnUndo.innerText = '↩️ Deshacer';
+                btnUndo.onclick = () => { textarea.focus(); document.execCommand('undo'); textarea.dispatchEvent(new Event('input')); };
+
+                const btnClear = document.createElement('button');
+                btnClear.className = 'btn-clear';
+                btnClear.innerText = '🗑️ Borrar';
+                btnClear.onclick = () => {
+                    if(confirm('¿Borrar el contenido de esta casilla?')) {
+                        textarea.value = '';
+                        textarea.dispatchEvent(new Event('input'));
+                    }
+                };
+
+                tools.appendChild(btnPaste);
+                tools.appendChild(btnUndo);
+                tools.appendChild(btnClear);
+
+                details.appendChild(summary);
+                details.appendChild(textarea);
+                details.appendChild(tools);
+                container.appendChild(details);
+            });
+            
+            actualizarProgreso();
+        }
+
+        function guardarEnDB() {
+            if (db) {
+                const tx = db.transaction("estado", "readwrite");
+                tx.objectStore("estado").put(bloquesActuales, "lista_bloques");
+            }
+            localStorage.setItem('jf_filename', document.getElementById('filename').value);
+        }
+
+        function cargarDesdeDB() {
+            if (!db) return;
+            const tx = db.transaction("estado", "readonly");
+            const store = tx.objectStore("estado");
+            const req = store.get("lista_bloques");
+            
+            req.onsuccess = () => {
+                if (req.result) {
+                    bloquesActuales = req.result;
+                    document.getElementById('filename').value = localStorage.getItem('jf_filename') || 'index';
+                    renderizar();
+                } else {
+                    renderizar();
+                }
+            };
+        }
+
+        function procesarNuevosArchivos(nuevosBloques) {
+            bloquesActuales = nuevosBloques;
+            renderizar();
+            guardarEnDB();
+        }
+
+        document.getElementById('folder-input').addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if(files.length === 0) return;
+            
+            const txtFiles = files.filter(f => f.name.toLowerCase().endsWith('.txt') && !f.name.startsWith('.'));
+            
+            if(!confirm(`⚠️ Se borrarán los anteriores. ¿Cargar ${txtFiles.length} archivos .txt?`)) return;
+
+            document.getElementById('status-text').innerText = `Leyendo carpeta...`;
+            let nuevos = [];
+            let procesados = 0;
+
+            txtFiles.forEach((file) => {
+                const reader = new FileReader();
+                
+                reader.onload = (event) => {
+                    nuevos.push({ nombre: file.name, contenido: event.target.result });
+                    procesados++;
+                    if (procesados === txtFiles.length) {
+                        procesarNuevosArchivos(nuevos);
+                        setTimeout(() => actualizarProgreso(), 100); 
+                    }
+                };
+                
+                reader.onerror = () => {
+                    procesados++;
+                    if (procesados === txtFiles.length) {
+                        procesarNuevosArchivos(nuevos);
+                        setTimeout(() => actualizarProgreso(), 100);
+                    }
+                };
+
+                reader.readAsText(file);
+            });
+            e.target.value = '';
         });
 
-        function pegarTexto(index) {
-            const textarea = document.getElementById('bloque-' + index);
-            navigator.clipboard.readText().then(texto => {
-                if (texto) {
-                    historial[index].push(textarea.value);
-                    textarea.value = texto;
-                    localStorage.setItem('jf_block_' + index, texto);
-                    document.getElementById('status').innerText = 'Texto pegado 📋';
-                } else {
-                    alert("El portapapeles está vacío.");
-                }
-            }).catch(err => {
-                alert("No se pudo acceder al portapapeles. Mantén presionado y toca 'Pegar'.");
-            });
-        }
-
-        function deshacer(index) {
-            const textarea = document.getElementById('bloque-' + index);
-            const hist = historial[index];
+        document.getElementById('zip-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if(!confirm("⚠️ Se borrarán los anteriores. ¿Continuar?")) return;
             
-            if (hist.length > 1) {
-                hist.pop();
-                const estadoAnterior = hist[hist.length - 1];
-                textarea.value = estadoAnterior;
-                localStorage.setItem('jf_block-' + index, estadoAnterior);
-                document.getElementById('status').innerText = 'Cambio deshecho ↩️';
-            } else {
-                const guardado = localStorage.getItem('jf_block_' + index) || '';
-                if (textarea.value !== guardado) {
-                     textarea.value = guardado;
-                     document.getElementById('status').innerText = 'Restaurado al último guardado.';
-                } else {
-                     document.getElementById('status').innerText = 'No hay más cambios para deshacer.';
+            document.getElementById('status-text').innerText = 'Descomprimiendo ZIP...';
+            
+            try {
+                const zip = new JSZip();
+                const contents = await zip.loadAsync(file);
+                let nuevos = [];
+
+                for (const filename of Object.keys(contents.files)) {
+                    if (filename.toLowerCase().endsWith('.txt') && !filename.startsWith('__MACOSX')) {
+                        const text = await contents.files[filename].async("string");
+                        const nombreLimpio = filename.split('/').pop();
+                        nuevos.push({ nombre: nombreLimpio, contenido: text });
+                    }
                 }
+                
+                procesarNuevosArchivos(nuevos);
+                setTimeout(() => actualizarProgreso(), 100);
+            } catch (error) {
+                alert("Error al leer el ZIP.");
+                document.getElementById('status-text').innerText = 'Error con el ZIP.';
             }
-        }
+            e.target.value = '';
+        });
 
-        function borrarBloqueCompleto(index) {
-            const textarea = document.getElementById('bloque-' + index);
-            if (textarea.value.trim() === '') return;
-
-            if (confirm('¿Borrar todo el contenido de esta casilla?')) {
-                historial[index].push(textarea.value);
-                textarea.value = '';
-                localStorage.removeItem('jf_block_' + index);
-                document.getElementById('status').innerText = 'Bloque borrado 🗑️ (Puedes usar ↩️ para recuperarlo).';
+        function actualizarProgreso() {
+            if (bloquesActuales.length === 0) {
+                document.getElementById('progress-fill').style.width = '0%';
+                document.getElementById('status-text').innerText = 'Esperando archivos...';
+                return;
             }
+            let llenos = bloquesActuales.filter(b => b.contenido && b.contenido.trim() !== '').length;
+            document.getElementById('progress-fill').style.width = `${(llenos / bloquesActuales.length) * 100}%`;
+            document.getElementById('status-text').innerText = `Progreso: ${llenos}/${bloquesActuales.length} | En lista: ${bloquesActuales.length}`;
         }
 
         function descargarHTML() {
-            const nombreInput = document.getElementById('filename').value.trim() || 'index';
+            if (bloquesActuales.length === 0) return alert("No hay archivos cargados.");
             let contenidoFinal = '';
+            bloquesActuales.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true, sensitivity: 'base' }));
+            
+            bloquesActuales.forEach(b => {
+                if (b.contenido) contenidoFinal += b.contenido + '\n';
+            });
 
-            for (let i = 0; i < BLOQUES.length; i++) {
-                const txt = document.getElementById('bloque-' + i).value;
-                if (txt) { contenidoFinal += txt + '\n'; }
-            }
-
-            if (!contenidoFinal) {
-                alert("Las casillas están vacías.");
-                return;
-            }
-
+            const nombre = document.getElementById('filename').value.trim() || 'index';
             const blob = new Blob([contenidoFinal], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = nombreInput.endsWith('.html') ? nombreInput : nombreInput + '.html';
-            document.body.appendChild(a);
+            a.download = `${nombre}.html`;
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
-            document.getElementById('status').innerText = '¡Archivo HTML descargado!';
         }
 
         async function descargarZIP() {
-            if (typeof JSZip === 'undefined') {
-                alert("La librería ZIP no se ha cargado.");
-                return;
-            }
-
+            if (bloquesActuales.length === 0) return alert("No hay archivos cargados.");
             const zip = new JSZip();
-            let hayDatos = false;
+            bloquesActuales.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true, sensitivity: 'base' }));
 
-            for (let i = 0; i < BLOQUES.length; i++) {
-                const txt = document.getElementById('bloque-' + i).value;
-                if (txt && txt.trim() !== '') {
-                    const nombreLimpio = BLOQUES[i].replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-                    zip.file(nombreLimpio, txt);
-                    hayDatos = true;
+            bloquesActuales.forEach(b => {
+                if (b.contenido && b.contenido.trim() !== '') {
+                    zip.file(b.nombre, b.contenido);
                 }
-            }
+            });
+            
+            const content = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Partes_Ordenadas.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
 
-            if (!hayDatos) {
-                alert("No hay texto guardado.");
-                return;
+        function resetearTodo() {
+            if (confirm("¿Seguro que quieres borrar TODO el progreso?")) {
+                bloquesActuales = [];
+                if (db) {
+                    const tx = db.transaction("estado", "readwrite");
+                    tx.objectStore("estado").delete("lista_bloques");
+                }
+                localStorage.clear();
+                renderizar();
+                document.getElementById('status-text').innerText = 'Todo borrado.';
             }
+        }
 
-            document.getElementById('status').innerText = 'Creando ZIP... ⏳';
+        function exportarProyecto() {
+            if (bloquesActuales.length === 0) return alert("No hay nada que guardar.");
+            const proyecto = { bloques: bloquesActuales, filename: document.getElementById('filename').value };
+            const blob = new Blob([JSON.stringify(proyecto, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Respaldo_Montador.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
 
-            try {
-                const content = await zip.generateAsync({ type: "blob" });
-                const url = URL.createObjectURL(content);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'Bloques_Jennyfit.zip';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                document.getElementById('status').innerText = '¡ZIP descargado! ✅';
-            } catch (error) {
-                alert("Error al crear ZIP: " + error.message);
-            }
+        function importarProyecto(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.bloques) {
+                        bloquesActuales = data.bloques;
+                        document.getElementById('filename').value = data.filename || 'index';
+                        renderizar();
+                        guardarEnDB();
+                        alert("¡Progreso restaurado!");
+                    }
+                } catch (err) {
+                    alert("Error al leer el archivo de respaldo.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; 
         }
     </script>
 </body>
