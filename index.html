@@ -74,7 +74,7 @@
     <div class="upload-zone">
         <h3>OPCIÓN 1: Recomendada (Sube un .ZIP)</h3>
         <label class="btn-upload" for="zip-input">🗜️ Cargar archivo .ZIP</label>
-        <input type="file" id="zip-input" accept=".zip">
+        <input type="file" id="zip-input">
         
         <h3 style="margin-top: 15px;">OPCIÓN 2: Subir Carpeta</h3>
         <label class="btn-upload btn-folder" for="folder-input">📁 Seleccionar Carpeta</label>
@@ -284,7 +284,7 @@
             if (!file) return;
             if(!confirm("⚠️ Se borrarán los anteriores. ¿Continuar?")) return;
             
-            document.getElementById('status-text').innerText = 'Descomprimiendo ZIP...';
+            document.getElementById('status-text').innerText = 'Descomprimiendo ZIP...'; document.getElementById('filename').value = file.name.replace(/\.zip$/i, ''); document.getElementById('filename').style.background = '#86efac'; document.getElementById('filename').style.color = '#000000';
             
             try {
                 const zip = new JSZip();
@@ -353,7 +353,8 @@
             const url = URL.createObjectURL(content);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Partes_Ordenadas.zip`;
+            const nombreZip = document.getElementById('filename').value.trim() || 'Partes_Ordenadas';
+            a.download = `${nombreZip}.zip`;
             a.click();
             URL.revokeObjectURL(url);
         }
