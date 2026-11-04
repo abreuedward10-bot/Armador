@@ -33,7 +33,7 @@
         details[open] summary::after { content: '▲ Cerrar'; }
 
         textarea { 
-            width: 100%; height: 150px; background: #86efac; color: #000000; 
+            width: 100%; height: 150px; background: #09090b; color: var(--verde); 
             border: none; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde);
             padding: 10px; font-family: monospace; font-size: 0.8rem; resize: vertical; box-sizing: border-box;
         }
@@ -158,7 +158,7 @@
                 const textarea = document.createElement('textarea');
                 textarea.value = bloque.contenido;
                 
-                textarea.addEventListener('input', (e) => { e.target.style.background = '#ef4444'; e.target.style.color = '#ffffff';
+                textarea.addEventListener('input', (e) => { summary.style.color = '#ef4444'; e.target.style.background = '#ef4444'; e.target.style.color = '#ffffff';
                     bloque.contenido = e.target.value;
                     guardarEnDB();
                     actualizarProgreso();
